@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Risk Predictor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a1f2e 0%, #0f1117 100%);
+      border-bottom: 1px solid #2d3748;
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    header svg { flex-shrink: 0; }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: #f7fafc; }
+    header p  { font-size: 0.8rem; color: #718096; margin-top: 0.15rem; }
+
+    main {
+      max-width: 860px;
+      margin: 2.5rem auto;
+      padding: 0 1.5rem;
+    }
+
+    /* ── Lookup card ── */
+    .card {
+      background: #1a1f2e;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+    }
+    .card h2 { font-size: 1rem; font-weight: 600; color: #a0aec0; margin-bottom: 1.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    .form-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .form-group label { font-size: 0.78rem; color: #718096; font-weight: 500; }
+
+    input[type="text"], select {
+      background: #0f1117;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      color: #f7fafc;
+      font-size: 0.95rem;
+      padding: 0.6rem 0.9rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="text"] { width: 160px; text-transform: uppercase; letter-spacing: 0.08em; }
+    input[type="text"]::placeholder { text-transform: none; letter-spacing: 0; color: #4a5568; }
+    input[type="text"]:focus, select:focus { border-color: #4299e1; }
+    select { cursor: pointer; width: 180px; }
+
+    button {
+      background: #3182ce;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.65rem 1.4rem;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: #2b6cb0; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary {
+      background: #2d3748;
+    }
+    button.secondary:hover:not(:disabled) { background: #4a5568; }
+
+    /* ── Result panel ── */
+    #result { display: none; }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .ticker-badge {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #f7fafc;
+    }
+    .risk-pill {
+      font-size: 0.85rem;
+      font-weight: 700;
+      border-radius: 999px;
+      padding: 0.35rem 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .risk-LOW       { background: #276749; color: #9ae6b4; }
+    .risk-MODERATE  { background: #744210; color: #fbd38d; }
+    .risk-HIGH      { background: #7b341e; color: #feb2b2; }
+    .risk-VERY-HIGH { background: #63171b; color: #fc8181; }
+
+    .price-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-box {
+      background: #0f1117;
+      border: 1px solid #2d3748;
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+    }
+    .stat-box .label { font-size: 0.72rem; color: #718096; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; }
+    .stat-box .value { font-size: 1.25rem; font-weight: 700; color: #f7fafc; }
+    .stat-box .value.up   { color: #68d391; }
+    .stat-box .value.down { color: #fc8181; }
+
+    /* ── Risk meter ── */
+    .meter-wrap { margin-bottom: 1.5rem; }
+    .meter-wrap .label { font-size: 0.78rem; color: #718096; margin-bottom: 0.5rem; }
+    .meter-track {
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(to right, #276749, #744210, #7b341e, #63171b);
+      position: relative;
+    }
+    .meter-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid #0f1117;
+      box-shadow: 0 0 0 2px #4299e1;
+      transition: left 0.4s ease;
+    }
+    .meter-score {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #f7fafc;
+      text-align: center;
+      margin-top: 0.6rem;
+    }
+    .meter-score span { font-size: 1rem; color: #718096; font-weight: 400; }
+
+    /* ── Recommendation banner ── */
+    .rec-banner {
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .rec-SUITABLE  { background: #1c4532; border: 1px solid #276749; color: #9ae6b4; }
+    .rec-CAUTION   { background: #44270a; border: 1px solid #c05621; color: #fbd38d; }
+    .rec-AVOID     { background: #3d1515; border: 1px solid #c53030; color: #fc8181; }
+
+    /* ── Details grid ── */
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.75rem;
+    }
+    .detail-item { background: #0f1117; border: 1px solid #2d3748; border-radius: 8px; padding: 0.75rem 1rem; }
+    .detail-item .label { font-size: 0.7rem; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; }
+    .detail-item .value { font-size: 0.95rem; font-weight: 600; color: #e2e8f0; margin-top: 0.2rem; }
+
+    /* ── Error ── */
+    .error-box {
+      background: #3d1515;
+      border: 1px solid #c53030;
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      color: #fc8181;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    /* ── Screener table ── */
+    #screener-result { display: none; margin-top: 1rem; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    thead th {
+      background: #0f1117;
+      color: #718096;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid #2d3748;
+    }
+    tbody tr { border-bottom: 1px solid #1a1f2e; transition: background 0.1s; }
+    tbody tr:hover { background: #1a1f2e; }
+    tbody td { padding: 0.6rem 0.8rem; color: #e2e8f0; }
+    .score-cell { font-weight: 700; }
+    .up   { color: #68d391; }
+    .down { color: #fc8181; }
+
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.4rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 520px) {
+      .form-row { flex-direction: column; }
+      input[type="text"], select { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+    <rect width="32" height="32" rx="8" fill="#3182ce"/>
+    <polyline points="4,22 10,14 16,18 22,8 28,12" stroke="white" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+    <circle cx="28" cy="12" r="2.5" fill="white"/>
+  </svg>
+  <div>
+    <h1>Stock Risk Predictor</h1>
+    <p>Weekly ML-powered risk analysis &amp; price prediction</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Lookup card -->
+  <div class="card">
+    <h2>Lookup a Stock</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="ticker-input">Ticker symbol</label>
+        <input id="ticker-input" type="text" placeholder="e.g. TSLA" maxlength="10" />
+      </div>
+      <div class="form-group">
+        <label for="tolerance-select">Your risk tolerance</label>
+        <select id="tolerance-select">
+          <option value="">— Skip —</option>
+          <option value="low">Low  (0–30)</option>
+          <option value="moderate">Moderate  (30–50)</option>
+          <option value="high">High  (50–70)</option>
+          <option value="very high">Very High  (70–100)</option>
+        </select>
+      </div>
+      <button id="lookup-btn" onclick="lookupStock()">Analyse</button>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-box" class="error-box"></div>
+
+  <!-- Result -->
+  <div id="result" class="card">
+    <div class="result-header">
+      <span id="res-ticker" class="ticker-badge"></span>
+      <span id="res-risk-pill" class="risk-pill"></span>
+    </div>
+
+    <div class="price-row">
+      <div class="stat-box">
+        <div class="label">Current Price</div>
+        <div id="res-current" class="value"></div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Predicted (next week)</div>
+        <div id="res-predicted" class="value"></div>
+      </div>
+      <div class="stat-box">
+        <div class="label">Expected Change</div>
+        <div id="res-change" class="value"></div>
+      </div>
+    </div>
+
+    <div class="meter-wrap">
+      <div class="label">Risk Score</div>
+      <div class="meter-track">
+        <div id="meter-thumb" class="meter-thumb" style="left:0%"></div>
+      </div>
+      <div id="res-score" class="meter-score"></div>
+    </div>
+
+    <div id="rec-banner" class="rec-banner" style="display:none"></div>
+
+    <div class="details-grid">
+      <div class="detail-item">
+        <div class="label">RSI</div>
+        <div id="res-rsi" class="value"></div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Weekly Volatility</div>
+        <div id="res-vol" class="value"></div>
+      </div>
+      <div class="detail-item">
+        <div class="label">Model Accuracy (MAPE)</div>
+        <div id="res-mape" class="value"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screener card -->
+  <div class="card">
+    <h2>Full Watchlist Screener</h2>
+    <p style="font-size:0.82rem;color:#718096;margin-bottom:1rem;">
+      Ranks all default tickers by risk score. Takes ~30–60 seconds.
+    </p>
+    <button class="secondary" id="screen-btn" onclick="runScreener()">Run Screener</button>
+
+    <div id="screener-result">
+      <div class="table-wrap" style="margin-top:1.25rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Risk Score</th>
+              <th>Risk Level</th>
+              <th>Current Price</th>
+              <th>Predicted Price</th>
+              <th>Change</th>
+              <th>Volatility</th>
+              <th>RSI</th>
+              <th>MAPE</th>
+            </tr>
+          </thead>
+          <tbody id="screener-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  function riskLabel(score) {
+    if (score >= 70) return "VERY HIGH";
+    if (score >= 50) return "HIGH";
+    if (score >= 30) return "MODERATE";
+    return "LOW";
+  }
+
+  function riskClass(label) {
+    return "risk-" + label.replace(" ", "-");
+  }
+
+  async function lookupStock() {
+    const ticker = document.getElementById("ticker-input").value.trim();
+    const tolerance = document.getElementById("tolerance-select").value;
+    if (!ticker) { showError("Please enter a ticker symbol."); return; }
+
+    const btn = document.getElementById("lookup-btn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Analysing…';
+    hideError();
+    document.getElementById("result").style.display = "none";
+
+    try {
+      const res = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker, tolerance }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || "Something went wrong."); return; }
+      renderResult(data);
+    } catch (e) {
+      showError("Network error — is the server running?");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Analyse";
+    }
+  }
+
+  function renderResult(d) {
+    const label = d.risk_label;
+    document.getElementById("res-ticker").textContent = d.ticker;
+
+    const pill = document.getElementById("res-risk-pill");
+    pill.textContent = label;
+    pill.className = "risk-pill " + riskClass(label);
+
+    document.getElementById("res-current").textContent = "$" + d.current_price.toFixed(2);
+
+    const predEl = document.getElementById("res-predicted");
+    predEl.textContent = "$" + d.predicted_price.toFixed(2);
+
+    const changeEl = document.getElementById("res-change");
+    const isUp = d.predicted_change.startsWith("+");
+    changeEl.textContent = d.predicted_change;
+    changeEl.className = "value " + (isUp ? "up" : "down");
+
+    // Meter
+    document.getElementById("meter-thumb").style.left = d.risk_score + "%";
+    document.getElementById("res-score").innerHTML =
+      d.risk_score + '<span> / 100</span>';
+
+    // Recommendation
+    const rec = document.getElementById("rec-banner");
+    if (d.recommendation) {
+      const key = d.recommendation.split("—")[0].trim(); // SUITABLE / CAUTION / AVOID
+      rec.className = "rec-banner rec-" + key;
+      const icons = { SUITABLE: "✅", CAUTION: "⚠️", AVOID: "🚫" };
+      rec.innerHTML = (icons[key] || "") + " <strong>" + d.tolerance + " tolerance:</strong> " + d.recommendation;
+      rec.style.display = "flex";
+    } else {
+      rec.style.display = "none";
+    }
+
+    document.getElementById("res-rsi").textContent = d.rsi;
+    document.getElementById("res-vol").textContent = d.volatility;
+    document.getElementById("res-mape").textContent = d.val_mape;
+
+    document.getElementById("result").style.display = "block";
+  }
+
+  async function runScreener() {
+    const btn = document.getElementById("screen-btn");
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Screening watchlist…';
+    document.getElementById("screener-result").style.display = "none";
+
+    try {
+      const res = await fetch("/api/screen");
+      const rows = await res.json();
+      renderScreener(rows);
+    } catch (e) {
+      showError("Screener failed — is the server running?");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Run Screener";
+    }
+  }
+
+  function renderScreener(rows) {
+    const tbody = document.getElementById("screener-tbody");
+    tbody.innerHTML = "";
+    rows.forEach(r => {
+      const label = riskLabel(r.risk_score);
+      const isUp = (r.predicted_change || "").startsWith("+");
+      const scoreColor = r.risk_score >= 70 ? "#fc8181" : r.risk_score >= 50 ? "#f6ad55" : r.risk_score >= 30 ? "#fbd38d" : "#68d391";
+      tbody.innerHTML += `
+        <tr>
+          <td><strong>${r.ticker}</strong></td>
+          <td class="score-cell" style="color:${scoreColor}">${r.risk_score}</td>
+          <td><span class="risk-pill ${riskClass(label)}" style="font-size:0.72rem;padding:0.2rem 0.6rem">${label}</span></td>
+          <td>$${parseFloat(r.current_price).toFixed(2)}</td>
+          <td>$${parseFloat(r.predicted_price).toFixed(2)}</td>
+          <td class="${isUp ? 'up' : 'down'}">${r.predicted_change}</td>
+          <td>${r.volatility_4w}</td>
+          <td>${parseFloat(r.RSI).toFixed(1)}</td>
+          <td>${r.val_mape}</td>
+        </tr>`;
+    });
+    document.getElementById("screener-result").style.display = "block";
+  }
+
+  function showError(msg) {
+    const el = document.getElementById("error-box");
+    el.textContent = "⚠ " + msg;
+    el.style.display = "block";
+  }
+  function hideError() {
+    document.getElementById("error-box").style.display = "none";
+  }
+
+  // Allow Enter key to trigger lookup
+  document.getElementById("ticker-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") lookupStock();
+  });
+</script>
+
+</body>
+</html>
